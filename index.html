@@ -3,63 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <title>Shipment Tracker</title>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { width: 100%; border-collapse: collapse; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); }
-        th, td { padding: 12px; text-align: left; }
-        th { background-color: #333; color: white; font-size: 16px; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
-        .green { color: green; font-weight: bold; }
-        .orange { color: orange; font-weight: bold; }
-        .red { color: red; font-weight: bold; }
-        .inquiry-btn { background-color: red; color: white; padding: 5px 10px; border: none; cursor: pointer; }
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            color: #2E3A59;
+            text-align: center;
+            font-size: 24px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        th, td {
+            padding: 14px;
+            text-align: left;
+        }
+        th {
+            background-color: #2E3A59;
+            color: white;
+            font-size: 16px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .green { color: #4CAF50; font-weight: bold; }
+        .orange { color: #FF9800; font-weight: bold; }
+        .red { color: #E53935; font-weight: bold; }
+        .inquiry-btn {
+            background-color: #E53935;
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .inquiry-btn:hover {
+            background-color: #C62828;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+            max-width: 900px; /* Match table width */
+            margin: auto; /* Center map */
+        }
     </style>
 </head>
 <body>
-    <h1>Client Shipments</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>Tracking Number</th>
-                <th>Transit Time</th>
-                <th>Status</th>
-                <th>In Europe?</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td class="orange">4047201194363</td>
-                <td>8 days</td>
-                <td>In Transit</td>
-                <td>✅ Yes</td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="green">4047201194363</td>
-                <td>5 days</td>
-                <td>Delivered</td>
-                <td>✅ Yes</td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="red">4047201194585</td>
-                <td>15 days</td>
-                <td>Delayed</td>
-                <td>❌ No</td>
-                <td><button class="inquiry-btn" onclick="startInquiry('4047201194585')">Start Inquiry</button></td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="container">
+        <h1>Client Shipments</h1>
+        <table id="shipmentTable">
+            <thead>
+                <tr>
+                    <th>Tracking Number</th>
+                    <th>Transit Time</th>
+                    <th>Status</th>
+                    <th>Country & ISO Code</th>
+                    <th>Shipment Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="orange">4047201194363</td>
+                    <td></td>
+                    <td>In Transit</td>
+                    <td>Germany (DE)</td>
+                    <td>2025-05-25</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td class="green">4047201194363</td>
+                    <td></td>
+                    <td>Delivered</td>
+                    <td>France (FR)</td>
+                    <td>2025-05-28</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td class="red">4047201194585</td>
+                    <td></td>
+                    <td>Delayed</td>
+                    <td>United States (US)</td>
+                    <td>2025-05-20</td>
+                    <td><button class="inquiry-btn" onclick="startInquiry('4047201194585')">Start Inquiry</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h1>Shipment Destinations</h1>
+    <div id="map"></div>
 
     <script>
+        var map = L.map('map', {
+            maxBounds: [[-85, -180], [85, 180]], // Restrict world bounds
+            maxBoundsViscosity: 1.0, // Prevent dragging beyond boundaries
+            minZoom: 2,
+            maxZoom: 8
+        }).setView([20, 0], 2);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap',
+            noWrap: true // Prevent unwanted map wrapping
+        }).addTo(map);
+
+        const countryWeekends = {
+            "Germany": [6, 0], "France": [6, 0], "United States": [6, 0],
+            "Saudi Arabia": [5, 6], "Israel": [5, 6]
+        };
+
+        function calculateWorkingDays(startDate, country) {
+            let currentDate = new Date(startDate);
+            let today = new Date();
+            let workingDays = 0;
+            let weekends = countryWeekends[country] || [6, 0];
+
+            while (currentDate < today) {
+                let dayOfWeek = currentDate.getDay();
+                if (!weekends.includes(dayOfWeek)) {
+                    workingDays++;
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            return workingDays;
+        }
+
+        function updateMap() {
+            var countryData = {};
+
+            document.querySelectorAll("#shipmentTable tbody tr").forEach(row => {
+                let shippedDate = new Date(row.cells[4].innerText);
+                let country = row.cells[3].innerText.split("(")[0].trim();
+                let transitTime = calculateWorkingDays(shippedDate, country);
+
+                if (!countryData[country]) {
+                    countryData[country] = { total: 0, delayed: 0, latlng: getCountryLatLng(country) };
+                }
+                countryData[country].total++;
+                if (transitTime > 10) {
+                    countryData[country].delayed++;
+                }
+
+                row.cells[1].innerText = `${transitTime} working days`;
+            });
+
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            Object.keys(countryData).forEach(country => {
+                let data = countryData[country];
+                if (data.latlng) {
+                    let marker = L.marker(data.latlng).addTo(map);
+                    marker.bindPopup(`<b>${country}</b><br>Total Shipments: ${data.total}<br>Delayed: ${data.delayed}`);
+                }
+            });
+        }
+
+        function getCountryLatLng(country) {
+            const countryCoordinates = {
+                "Germany": [51.1657, 10.4515], "France": [46.6031, 1.8883], "United States": [37.0902, -95.7129]
+            };
+            return countryCoordinates[country] || null;
+        }
+
         function startInquiry(trackingNumber) {
-            const email = "support@parcel.one"; // Change to actual support email
+            const email = "support@parcel.one";
             const subject = encodeURIComponent(`Inquiry about delayed shipment: ${trackingNumber}`);
-            const body = encodeURIComponent(`Hello Support,\n\nMy shipment with tracking number ${trackingNumber} has been delayed for more than 14 days. Please provide an update.\n\nThank you.`);
+            const body = encodeURIComponent(`Hello Support,\n\nMy shipment with tracking number ${trackingNumber} has been delayed. Please provide an update.\n\nThank you.`);
 
             window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
         }
+
+        window.onload = function() {
+            updateMap();
+        };
     </script>
 </body>
 </html>
